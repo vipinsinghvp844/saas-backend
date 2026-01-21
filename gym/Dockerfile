@@ -1,11 +1,10 @@
 FROM php:8.2-cli
 
-# MySQL driver install karo
-RUN docker-php-ext-install pdo pdo_mysql mysqli
+RUN apt-get update \
+    && docker-php-ext-install pdo pdo_mysql mysqli
 
 WORKDIR /app
 COPY . .
 
-EXPOSE 10000
-
-CMD ["php", "-S", "0.0.0.0:10000", "index.php"]
+# Railway ka PORT use karo (dynamic)
+CMD ["sh", "-c", "php -S 0.0.0.0:$PORT index.php"]
