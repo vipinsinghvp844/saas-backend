@@ -1,11 +1,5 @@
 <?php
-require_once __DIR__ . '/vendor/autoload.php';
-require_once __DIR__ . '/utils/mail.php';
+require_once __DIR__ . './config/cors.php';
 
-sendMail(
-  "vipin.stevesai@gmail.com",
-  "SMTP Test",
-  "Gmail SMTP is working 🎉"
-);
-
-echo "Mail sent";
+echo"hello";
+exit;

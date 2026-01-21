@@ -2,10 +2,10 @@
 // config/db.php
 
 class Database {
-    private $host = "localhost";
-    private $db_name = "gym_saas";
+    private $host = "mysql.railway.internal";
+    private $db_name = "railway";
     private $username = "root";
-    private $password = "";
+    private $password = "NTOLZmAKWUyNWEKNNyozVvvsdFrVKwJW";
     public $conn;
 
     public function connect() {
