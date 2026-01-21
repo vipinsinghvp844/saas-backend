@@ -15,7 +15,7 @@ jobs:
       - name: Deploy to FTP server
         uses: SamKirkland/FTP-Deploy-Action@4.0.0
         with:
-          ftp-server: ftp://yourdomain.infinityfreeapp.com
+          ftp-server: ftp://gym-saas-backend.infinityfreeapp.com/
           ftp-username: ${{secrets.FTP_USERNAME}}
           ftp-password: ${{secrets.FTP_PASSWORD}}
           local-dir: ./ # Local repository ki root directory se files upload karenge
