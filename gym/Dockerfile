@@ -6,5 +6,4 @@ RUN apt-get update \
 WORKDIR /app
 COPY . .
 
-# Railway ka PORT use karo (dynamic)
-CMD ["sh", "-c", "php -S 0.0.0.0:$PORT index.php"]
+CMD ["sh", "-c", "php -S 0.0.0.0:$PORT"]
