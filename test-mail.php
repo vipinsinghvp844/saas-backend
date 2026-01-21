@@ -1,5 +1,12 @@
 <?php
-require_once __DIR__ . './config/cors.php';
+// test_connection.php
+require_once 'config/db.php';
 
-echo"hello";
-exit;
+$database = new Database();
+$conn = $database->connect();
+
+if ($conn) {
+    echo "Database connected successfully!";
+} else {
+    echo "Failed to connect to the database.";
+}
