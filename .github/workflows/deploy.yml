@@ -19,4 +19,4 @@ jobs:
           ftp-username: ${{secrets.FTP_USERNAME}}
           ftp-password: ${{secrets.FTP_PASSWORD}}
           local-dir: ./ # Local repository ki root directory se files upload karenge
-          remote-dir: /public_html  # Files ko public_html folder mein upload karna hai
+          remote-dir: /htdocs  # Files ko public_html folder mein upload karna hai
