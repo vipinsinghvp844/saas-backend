@@ -1,0 +1,2 @@
+<?php
+echo "GYMS BACKEND ROOT WORKING";

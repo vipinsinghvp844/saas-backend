@@ -1,0 +1,18 @@
+{
+    "name": "vinayak/gyms-backend",
+    "description": "Gym SaaS Backend",
+    "autoload": {
+        "psr-4": {
+            "Vinayak\\GymsBackend\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "mitesh-123",
+            "email": "mitesh93official@gmail.com"
+        }
+    ],
+    "require": {
+        "phpmailer/phpmailer": "^7.0"
+    }
+}
