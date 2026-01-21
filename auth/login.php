@@ -54,7 +54,7 @@ try {
             "message" => "Invalid credentials"
         ]);
         exit;
-    }
+    } 
 
     /* ✅ USER STATUS CHECK */
     if (strtolower($user['status']) !== 'active') {
