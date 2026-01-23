@@ -103,7 +103,9 @@ try {
   $conn->beginTransaction();
 
   /* ✅ Trial Setup */
-  $trialDays = 14;
+  $trialDays = (int)($request['trial_days'] ?? 14);
+  if ($trialDays <= 0) $trialDays = 14;
+
   $trialEndsAt = date("Y-m-d H:i:s", strtotime("+$trialDays days"));
 
   /* ✅ create gym */

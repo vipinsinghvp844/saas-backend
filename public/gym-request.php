@@ -13,6 +13,9 @@ try {
   $owner_email = strtolower(trim($data['owner_email'] ?? ''));
   $phone       = trim($data['phone'] ?? '');
   $plan_id     = $data['plan_id'] ?? null;
+  $trial_days = (int)($data['trial_days'] ?? 14);
+if ($trial_days <= 0) $trial_days = 14;
+
 
   // ✅ optional extra fields (frontend may send)
   $city = trim($data['city'] ?? '');
@@ -97,9 +100,11 @@ try {
   /* ✅ insert into gym_requests */
   $stmt = $conn->prepare("
     INSERT INTO gym_requests
-      (gym_name, owner_name, owner_email, plan_id, phone, plan_name, amount, payment_status, status, city, note)
+      (gym_name, owner_name, owner_email, plan_id, phone, plan_name, amount, trial_days
+, payment_status, status, city, note)
     VALUES
-      (:gym_name, :owner_name, :owner_email, :plan_id, :phone, :plan_name, :amount, 'unpaid', 'pending', :city, :note)
+      (:gym_name, :owner_name, :owner_email, :plan_id, :phone, :plan_name, :amount, :trial_days
+, 'unpaid', 'pending', :city, :note)
   ");
 
   $stmt->execute([
@@ -110,6 +115,7 @@ try {
     ":phone"       => $phone ?: null,
     ":plan_name"   => $plan['name'],   // ✅ snapshot
     ":amount"      => $plan['price'],  // ✅ snapshot
+    ":trial_days"  => $trial_days,
     ":city"        => $city ?: null,
     ":note"        => $note ?: null,
   ]);
