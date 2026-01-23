@@ -15,7 +15,7 @@ try {
 
   if ($id <= 0) {
     http_response_code(400);
-    echo json_encode(["status"=>false,"message"=>"Page id required"]);
+    echo json_encode(["status" => false, "message" => "Page id required"]);
     exit;
   }
 
@@ -45,19 +45,26 @@ try {
 
   if (!$row) {
     http_response_code(404);
-    echo json_encode(["status"=>false,"message"=>"Page not found"]);
+    echo json_encode(["status" => false, "message" => "Page not found"]);
     exit;
   }
 
-  echo json_encode(["status"=>true,"data"=>$row]);
+  // ✅ decode JSON for frontend convenience (optional)
+  $row['structure_json'] = json_decode($row['structure_json'] ?? "{}", true);
+  $row['page_data_json'] = json_decode($row['page_data_json'] ?? "{}", true);
+
+  echo json_encode([
+    "status" => true,
+    "data" => $row
+  ]);
   exit;
 
 } catch (Exception $e) {
   http_response_code(500);
   echo json_encode([
-    "status"=>false,
-    "message"=>"Failed to load page",
-    "error"=>$e->getMessage()
+    "status" => false,
+    "message" => "Failed to load page",
+    "error" => $e->getMessage()
   ]);
   exit;
 }

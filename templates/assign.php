@@ -7,7 +7,6 @@ require_once "../middleware/auth.php";
 require_once "../middleware/roleGuard.php";
 
 try {
-
   $auth = authenticate();
   $GLOBALS['auth_user'] = $auth;
   requireRole(['super_admin']);
@@ -15,12 +14,14 @@ try {
   $db = new Database();
   $conn = $db->connect();
 
-  $type   = strtolower(trim($_GET['type'] ?? 'all'));
-  $search = trim($_GET['search'] ?? '');
+  // ✅ Filters
+  $type   = strtolower(trim($_GET['type'] ?? 'all'));      // all | platform | gym
+  $search = trim($_GET['search'] ?? '');                   // keyword search
 
-  // ✅ pagination
+  // ✅ Pagination
   $page  = (int)($_GET['page'] ?? 1);
   $limit = (int)($_GET['limit'] ?? 10);
+
   if ($page < 1) $page = 1;
   if ($limit < 1) $limit = 10;
   if ($limit > 100) $limit = 100;
@@ -31,14 +32,14 @@ try {
   $params = [];
 
   // ✅ type filter
-  if ($type !== 'all' && in_array($type, ['platform', 'gym'], true)) {
-    $where[] = "LOWER(TRIM(type)) = :type";
+  if ($type !== "all" && in_array($type, ["platform", "gym"], true)) {
+    $where[] = "LOWER(t.type) = :type";
     $params[":type"] = $type;
   }
 
   // ✅ search filter
-  if ($search !== '') {
-    $where[] = "(name LIKE :q OR type LIKE :q)";
+  if ($search !== "") {
+    $where[] = "(t.name LIKE :q OR t.type LIKE :q)";
     $params[":q"] = "%" . $search . "%";
   }
 
@@ -47,19 +48,28 @@ try {
     $whereSql = "WHERE " . implode(" AND ", $where);
   }
 
-  // ✅ total count
-  $countStmt = $conn->prepare("SELECT COUNT(*) as total FROM templates $whereSql");
+  // ✅ Count query
+  $countStmt = $conn->prepare("
+    SELECT COUNT(*) as total
+    FROM templates t
+    $whereSql
+  ");
   $countStmt->execute($params);
   $total = (int)($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
   $totalPages = (int)ceil($total / $limit);
 
-  // ✅ main query
+  // ✅ Data query
   $stmt = $conn->prepare("
-    SELECT id, type, name, structure_json, updated_at
-    FROM templates
+    SELECT
+      t.id,
+      t.type,
+      t.name,
+      t.structure_json,
+      t.updated_at
+    FROM templates t
     $whereSql
-    ORDER BY id DESC
+    ORDER BY t.id DESC
     LIMIT $limit OFFSET $offset
   ");
   $stmt->execute($params);
@@ -71,7 +81,7 @@ try {
       "page" => $page,
       "limit" => $limit,
       "total" => $total,
-      "totalPages" => $totalPages,
+      "totalPages" => $totalPages
     ]
   ]);
   exit;

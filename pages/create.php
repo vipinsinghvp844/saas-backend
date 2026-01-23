@@ -17,11 +17,25 @@ try {
   $slug = strtolower(trim($data['slug'] ?? ''));
   $template_id = (int)($data['template_id'] ?? 0);
 
+  // ✅ normalize slug
+  $slug = preg_replace('/\s+/', '-', $slug);
+  $slug = preg_replace('/\-+/', '-', $slug);
+  $slug = trim($slug, "-");
+
   if ($slug === '' || $template_id <= 0) {
     http_response_code(400);
     echo json_encode([
       "status" => false,
       "message" => "slug and template_id are required"
+    ]);
+    exit;
+  }
+
+  if (strlen($slug) < 2 || strlen($slug) > 80) {
+    http_response_code(400);
+    echo json_encode([
+      "status" => false,
+      "message" => "Slug length must be between 2 and 80 characters"
     ]);
     exit;
   }
@@ -39,7 +53,7 @@ try {
   $db = new Database();
   $conn = $db->connect();
 
-  // ✅ prevent duplicate slug for platform
+  // ✅ prevent duplicate slug for platform site
   $check = $conn->prepare("
     SELECT id FROM pages
     WHERE site_type='platform' AND slug=:slug
@@ -76,7 +90,7 @@ try {
   }
 
   // ✅ platform page must use platform template
-  if ($tpl['type'] !== 'platform') {
+  if (($tpl['type'] ?? '') !== 'platform') {
     http_response_code(400);
     echo json_encode([
       "status" => false,
@@ -103,13 +117,11 @@ try {
     ":page_data_json" => $page_data_json
   ]);
 
-  $pageId = $conn->lastInsertId();
-
   echo json_encode([
     "status" => true,
     "message" => "Page created ✅",
     "data" => [
-      "id" => $pageId,
+      "id" => (int)$conn->lastInsertId(),
       "slug" => $slug
     ]
   ]);

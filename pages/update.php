@@ -18,41 +18,66 @@ try {
 
   if ($id <= 0) {
     http_response_code(400);
-    echo json_encode(["status"=>false,"message"=>"Page id required"]);
+    echo json_encode(["status" => false, "message" => "Page id required"]);
     exit;
   }
 
-  if (!$page_data_json || !is_array($page_data_json)) {
+  // ✅ validate page_data_json must be array (json object)
+  if ($page_data_json === null || !is_array($page_data_json)) {
     http_response_code(400);
-    echo json_encode(["status"=>false,"message"=>"page_data_json must be an object"]);
+    echo json_encode([
+      "status" => false,
+      "message" => "page_data_json must be a valid JSON object"
+    ]);
     exit;
   }
 
   $db = new Database();
   $conn = $db->connect();
 
+  // ✅ check page exists
+  $check = $conn->prepare("SELECT id FROM pages WHERE id=:id LIMIT 1");
+  $check->execute([":id" => $id]);
+  if (!$check->fetch(PDO::FETCH_ASSOC)) {
+    http_response_code(404);
+    echo json_encode(["status" => false, "message" => "Page not found"]);
+    exit;
+  }
+
+  $encoded = json_encode($page_data_json);
+  if ($encoded === false) {
+    http_response_code(400);
+    echo json_encode([
+      "status" => false,
+      "message" => "Invalid page_data_json (JSON encode failed)"
+    ]);
+    exit;
+  }
+
   $stmt = $conn->prepare("
     UPDATE pages
     SET page_data_json = :page_data_json,
         updated_at = NOW()
     WHERE id = :id
-    LIMIT 1
   ");
 
   $stmt->execute([
-    ":page_data_json" => json_encode($page_data_json),
+    ":page_data_json" => $encoded,
     ":id" => $id
   ]);
 
-  echo json_encode(["status"=>true,"message"=>"Page updated ✅"]);
+  echo json_encode([
+    "status" => true,
+    "message" => "Page updated ✅"
+  ]);
   exit;
 
 } catch (Exception $e) {
   http_response_code(500);
   echo json_encode([
-    "status"=>false,
-    "message"=>"Failed to update page",
-    "error"=>$e->getMessage()
+    "status" => false,
+    "message" => "Failed to update page",
+    "error" => $e->getMessage()
   ]);
   exit;
 }

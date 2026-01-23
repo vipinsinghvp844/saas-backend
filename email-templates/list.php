@@ -7,7 +7,6 @@ require_once "../middleware/auth.php";
 require_once "../middleware/roleGuard.php";
 
 try {
-
   $auth = authenticate();
   $GLOBALS['auth_user'] = $auth;
   requireRole(['super_admin']);
@@ -15,12 +14,12 @@ try {
   $db = new Database();
   $conn = $db->connect();
 
-  $type   = strtolower(trim($_GET['type'] ?? 'all'));
-  $search = trim($_GET['search'] ?? '');
+  $status = strtolower(trim($_GET['status'] ?? "all"));
+  $search = trim($_GET['search'] ?? "");
 
-  // ✅ pagination
   $page  = (int)($_GET['page'] ?? 1);
   $limit = (int)($_GET['limit'] ?? 10);
+
   if ($page < 1) $page = 1;
   if ($limit < 1) $limit = 10;
   if ($limit > 100) $limit = 100;
@@ -30,48 +29,56 @@ try {
   $where = [];
   $params = [];
 
-  // ✅ type filter
-  if ($type !== 'all' && in_array($type, ['platform', 'gym'], true)) {
-    $where[] = "LOWER(TRIM(type)) = :type";
-    $params[":type"] = $type;
+  if ($status !== "all") {
+    $where[] = "LOWER(et.status) = :status";
+    $params[":status"] = $status;
   }
 
-  // ✅ search filter
-  if ($search !== '') {
-    $where[] = "(name LIKE :q OR type LIKE :q)";
+  if ($search !== "") {
+    $where[] = "(et.name LIKE :q OR et.slug LIKE :q OR et.subject LIKE :q)";
     $params[":q"] = "%" . $search . "%";
   }
 
   $whereSql = "";
-  if (!empty($where)) {
-    $whereSql = "WHERE " . implode(" AND ", $where);
-  }
+  if (!empty($where)) $whereSql = "WHERE " . implode(" AND ", $where);
 
-  // ✅ total count
-  $countStmt = $conn->prepare("SELECT COUNT(*) as total FROM templates $whereSql");
+  // ✅ count
+  $countStmt = $conn->prepare("
+    SELECT COUNT(*) AS total
+    FROM email_templates et
+    $whereSql
+  ");
   $countStmt->execute($params);
   $total = (int)($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
   $totalPages = (int)ceil($total / $limit);
+  if ($totalPages < 1) $totalPages = 1;
 
-  // ✅ main query
   $stmt = $conn->prepare("
-    SELECT id, type, name, structure_json, updated_at
-    FROM templates
+    SELECT
+      et.id,
+      et.name,
+      et.slug,
+      et.subject,
+      et.status,
+      et.created_at,
+      et.updated_at
+    FROM email_templates et
     $whereSql
-    ORDER BY id DESC
+    ORDER BY et.id DESC
     LIMIT $limit OFFSET $offset
   ");
   $stmt->execute($params);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
   echo json_encode([
     "status" => true,
-    "data" => $stmt->fetchAll(PDO::FETCH_ASSOC),
+    "data" => $rows,
     "pagination" => [
       "page" => $page,
       "limit" => $limit,
       "total" => $total,
-      "totalPages" => $totalPages,
+      "totalPages" => $totalPages
     ]
   ]);
   exit;
@@ -80,7 +87,7 @@ try {
   http_response_code(500);
   echo json_encode([
     "status" => false,
-    "message" => "Failed to load templates",
+    "message" => "Failed to load email templates",
     "error" => $e->getMessage()
   ]);
   exit;
