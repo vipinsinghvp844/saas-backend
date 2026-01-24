@@ -5,7 +5,6 @@ header("Content-Type: application/json");
 require_once "../config/db.php";
 require_once "../middleware/auth.php";
 require_once "../middleware/roleGuard.php";
-require_once "./helpers.php";
 
 try {
   $auth = authenticate();
@@ -14,83 +13,66 @@ try {
 
   $data = json_decode(file_get_contents("php://input"), true);
 
-  $name = trim($data["name"] ?? "");
-  $slug = trim($data["slug"] ?? "");
-  $subject = trim($data["subject"] ?? "");
-  $html_body = (string)($data["html_body"] ?? "");
-  $status = strtolower(trim($data["status"] ?? "active"));
+  $slug = strtolower(trim($data['slug'] ?? ''));
+  $name = trim($data['name'] ?? '');
+  $subject = trim($data['subject'] ?? '');
+  $body_html = trim($data['body_html'] ?? '');
+  $status = strtolower(trim($data['status'] ?? 'active'));
 
-  if ($name === "") {
+  $variables_json = $data['variables_json'] ?? [];
+
+  if ($slug === '' || $name === '' || $subject === '' || $body_html === '') {
     http_response_code(400);
-    echo json_encode(["status" => false, "message" => "Template name required"]);
+    echo json_encode(["status"=>false,"message"=>"slug, name, subject, body_html required"]);
     exit;
   }
 
-  if ($slug === "") $slug = slugify($name);
-
-  if (!preg_match('/^[a-z0-9\-]+$/', $slug)) {
+  if (!preg_match('/^[a-z0-9\-_]+$/', $slug)) {
     http_response_code(400);
-    echo json_encode(["status" => false, "message" => "Invalid slug format"]);
+    echo json_encode(["status"=>false,"message"=>"Invalid slug. Use letters, numbers, dash, underscore"]);
     exit;
   }
 
-  if ($subject === "") {
-    http_response_code(400);
-    echo json_encode(["status" => false, "message" => "Subject required"]);
-    exit;
-  }
-
-  if ($html_body === "") {
-    http_response_code(400);
-    echo json_encode(["status" => false, "message" => "HTML body required"]);
-    exit;
-  }
-
-  if ($status !== "active" && $status !== "inactive") {
-    $status = "active";
-  }
+  if ($status !== 'active' && $status !== 'inactive') $status = 'active';
 
   $db = new Database();
   $conn = $db->connect();
 
-  // ✅ duplicate slug check
   $check = $conn->prepare("SELECT id FROM email_templates WHERE slug=:slug LIMIT 1");
-  $check->execute([":slug" => $slug]);
-  if ($check->fetch(PDO::FETCH_ASSOC)) {
+  $check->execute([":slug"=>$slug]);
+  if ($check->fetch()) {
     http_response_code(409);
-    echo json_encode(["status" => false, "message" => "Slug already exists"]);
+    echo json_encode(["status"=>false,"message"=>"Slug already exists"]);
     exit;
   }
 
   $stmt = $conn->prepare("
-    INSERT INTO email_templates (name, slug, subject, html_body, status)
-    VALUES (:name, :slug, :subject, :html_body, :status)
+    INSERT INTO email_templates (slug, name, subject, body_html, variables_json, status)
+    VALUES (:slug, :name, :subject, :body_html, :variables_json, :status)
   ");
 
   $stmt->execute([
-    ":name" => $name,
     ":slug" => $slug,
+    ":name" => $name,
     ":subject" => $subject,
-    ":html_body" => $html_body,
+    ":body_html" => $body_html,
+    ":variables_json" => json_encode(is_array($variables_json) ? $variables_json : []),
     ":status" => $status
   ]);
 
   echo json_encode([
-    "status" => true,
-    "message" => "Email template created ✅",
-    "data" => [
-      "id" => $conn->lastInsertId(),
-      "slug" => $slug
-    ]
+    "status"=>true,
+    "message"=>"Email template created ✅",
+    "data"=>["id"=>$conn->lastInsertId()]
   ]);
   exit;
 
 } catch (Exception $e) {
   http_response_code(500);
   echo json_encode([
-    "status" => false,
-    "message" => "Failed to create email template",
-    "error" => $e->getMessage()
+    "status"=>false,
+    "message"=>"Failed to create template",
+    "error"=>$e->getMessage()
   ]);
   exit;
 }

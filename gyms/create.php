@@ -7,7 +7,7 @@ header("Content-Type: application/json");
 require_once "../config/db.php";
 require_once "../middleware/auth.php";
 require_once "../middleware/roleGuard.php";
-require_once "../utils/mail.php";
+require_once "../mailer/send-template.php"; // ✅ NEW
 
 /* ✅ SLUG GENERATOR */
 function generateSlug(PDO $conn, string $name): string {
@@ -56,21 +56,20 @@ try {
     $status     = strtolower(trim($_POST['status'] ?? 'active'));
 
     /* 3️⃣ VALIDATION */
-   if (
-    empty($gym['gym_name']) ||
-    empty($gym['gym_email']) ||
-    empty($owner['owner_firstName']) ||
-    empty($owner['owner_email']) ||
-    empty($plan)
-) {
-    http_response_code(400);
-    echo json_encode([
-        "status" => false,
-        "message" => "Required fields missing"
-    ]);
-    exit;
-}
-
+    if (
+        empty($gym['gym_name']) ||
+        empty($gym['gym_email']) ||
+        empty($owner['owner_firstName']) ||
+        empty($owner['owner_email']) ||
+        empty($plan)
+    ) {
+        http_response_code(400);
+        echo json_encode([
+            "status" => false,
+            "message" => "Required fields missing"
+        ]);
+        exit;
+    }
 
     /* 4️⃣ DB */
     $db = new Database();
@@ -225,19 +224,19 @@ try {
     /* ✅ 13️⃣ COMMIT */
     $conn->commit();
 
-    /* ✅ 14️⃣ SEND EMAIL */
+    /* ✅ 14️⃣ SEND EMAIL (TEMPLATE BASED ✅) */
     $loginUrl = "http://localhost:5173/login";
 
-    sendMail(
+    sendTemplateMail(
         $owner['owner_email'],
-        "Your Gym Admin Account is Ready",
-        "
-        Your gym <b>{$gym['gym_name']}</b> has been created 🎉<br><br>
-        <b>Login:</b> {$loginUrl}<br>
-        <b>Email:</b> {$owner['owner_email']}<br>
-        <b>Password:</b> {$plainPassword}<br><br>
-        Please change your password after login.
-        "
+        "gym-created-credentials",
+        [
+            "owner_name" => trim(($owner['owner_firstName'] ?? '') . " " . ($owner['owner_LastName'] ?? '')),
+            "gym_name"   => $gym['gym_name'] ?? "Gym",
+            "login_url"  => $loginUrl,
+            "email"      => $owner['owner_email'],
+            "password"   => $plainPassword
+        ]
     );
 
     echo json_encode([

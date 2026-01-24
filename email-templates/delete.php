@@ -12,11 +12,11 @@ try {
   requireRole(['super_admin']);
 
   $data = json_decode(file_get_contents("php://input"), true);
-  $id = (int)($data["id"] ?? 0);
+  $id = (int)($data['id'] ?? 0);
 
   if ($id <= 0) {
     http_response_code(400);
-    echo json_encode(["status" => false, "message" => "Template id required"]);
+    echo json_encode(["status"=>false,"message"=>"Template id required"]);
     exit;
   }
 
@@ -24,17 +24,17 @@ try {
   $conn = $db->connect();
 
   $stmt = $conn->prepare("DELETE FROM email_templates WHERE id=:id LIMIT 1");
-  $stmt->execute([":id" => $id]);
+  $stmt->execute([":id"=>$id]);
 
-  echo json_encode(["status" => true, "message" => "Template deleted ✅"]);
+  echo json_encode(["status"=>true,"message"=>"Email template deleted ✅"]);
   exit;
 
 } catch (Exception $e) {
   http_response_code(500);
   echo json_encode([
-    "status" => false,
-    "message" => "Failed to delete template",
-    "error" => $e->getMessage()
+    "status"=>false,
+    "message"=>"Failed to delete template",
+    "error"=>$e->getMessage()
   ]);
   exit;
 }

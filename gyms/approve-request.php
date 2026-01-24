@@ -6,6 +6,7 @@ require_once "../config/db.php";
 require_once "../middleware/auth.php";
 require_once "../middleware/roleGuard.php";
 require_once "../utils/mail.php";
+require_once "../mailer/send-template.php";
 
 $auth = authenticate();
 $GLOBALS['auth_user'] = $auth;
@@ -79,11 +80,15 @@ if ($action === "rejected") {
     ":id" => $requestId
   ]);
 
-  sendMail(
-    $request['owner_email'],
-    "Gym Registration Rejected",
-    "Sorry, your gym request was rejected.<br><br>Reason:<br><b>$reason</b>"
-  );
+  sendTemplateMail(
+  $request['owner_email'],
+  "gym-request-rejected",
+  [
+    "owner_name" => $request['owner_name'] ?? "Owner",
+    "gym_name"   => $request['gym_name'] ?? "Gym",
+    "reason"     => $reason
+  ]
+);
 
   echo json_encode(["status" => true, "message" => "Request rejected ✅"]);
   exit;
@@ -272,18 +277,19 @@ try {
   /* ✅ send approval email */
   $loginUrl = "http://localhost:5173/login";
 
-  sendMail(
-    $request['owner_email'],
-    "Gym Approved – Login Details",
-    "
-    Your gym has been approved 🎉<br><br>
-    <b>Trial:</b> $trialDays days (ends on $trialEndsAt)<br><br>
-    <b>Login URL:</b> $loginUrl<br>
-    <b>Email:</b> {$request['owner_email']}<br>
-    <b>Password:</b> $password<br><br>
-    Please login and complete payment before trial ends.
-    "
-  );
+  sendTemplateMail(
+  $request['owner_email'],
+  "gym-approved-login",
+  [
+    "owner_name"    => $request['owner_name'] ?? "Owner",
+    "gym_name"      => $request['gym_name'] ?? "Gym",
+    "trial_days"    => $trialDays,
+    "trial_ends_at" => $trialEndsAt,
+    "login_url"     => $loginUrl,
+    "email"         => $request['owner_email'],
+    "password"      => $password
+  ]
+);
 
   echo json_encode(["status" => true, "message" => "Gym approved ✅ Trial started ✅ Invoice created ✅"]);
   exit;

@@ -14,58 +14,48 @@ try {
   $db = new Database();
   $conn = $db->connect();
 
-  $status = strtolower(trim($_GET['status'] ?? "all"));
-  $search = trim($_GET['search'] ?? "");
+  $status = strtolower(trim($_GET['status'] ?? 'all'));
+  $search = trim($_GET['search'] ?? '');
 
   $page  = (int)($_GET['page'] ?? 1);
   $limit = (int)($_GET['limit'] ?? 10);
 
   if ($page < 1) $page = 1;
-  if ($limit < 1) $limit = 10;
-  if ($limit > 100) $limit = 100;
+  if ($limit < 5) $limit = 10;
+  if ($limit > 50) $limit = 50;
 
   $offset = ($page - 1) * $limit;
 
   $where = [];
   $params = [];
 
-  if ($status !== "all") {
-    $where[] = "LOWER(et.status) = :status";
+  if ($status !== 'all') {
+    $where[] = "LOWER(status)=:status";
     $params[":status"] = $status;
   }
 
-  if ($search !== "") {
-    $where[] = "(et.name LIKE :q OR et.slug LIKE :q OR et.subject LIKE :q)";
+  if ($search !== '') {
+    $where[] = "(slug LIKE :q OR name LIKE :q OR subject LIKE :q)";
     $params[":q"] = "%" . $search . "%";
   }
 
   $whereSql = "";
-  if (!empty($where)) $whereSql = "WHERE " . implode(" AND ", $where);
+  if (!empty($where)) {
+    $whereSql = "WHERE " . implode(" AND ", $where);
+  }
 
-  // ✅ count
-  $countStmt = $conn->prepare("
-    SELECT COUNT(*) AS total
-    FROM email_templates et
-    $whereSql
-  ");
+  // ✅ total count
+  $countStmt = $conn->prepare("SELECT COUNT(*) AS total FROM email_templates $whereSql");
   $countStmt->execute($params);
   $total = (int)($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
-  $totalPages = (int)ceil($total / $limit);
-  if ($totalPages < 1) $totalPages = 1;
-
+  // ✅ list
   $stmt = $conn->prepare("
     SELECT
-      et.id,
-      et.name,
-      et.slug,
-      et.subject,
-      et.status,
-      et.created_at,
-      et.updated_at
-    FROM email_templates et
+      id, slug, name, subject, status, variables_json, created_at, updated_at
+    FROM email_templates
     $whereSql
-    ORDER BY et.id DESC
+    ORDER BY id DESC
     LIMIT $limit OFFSET $offset
   ");
   $stmt->execute($params);
@@ -73,12 +63,14 @@ try {
 
   echo json_encode([
     "status" => true,
-    "data" => $rows,
-    "pagination" => [
-      "page" => $page,
-      "limit" => $limit,
-      "total" => $total,
-      "totalPages" => $totalPages
+    "data" => [
+      "items" => $rows,
+      "pagination" => [
+        "page" => $page,
+        "limit" => $limit,
+        "total" => $total,
+        "pages" => $limit > 0 ? (int)ceil($total / $limit) : 1
+      ]
     ]
   ]);
   exit;
