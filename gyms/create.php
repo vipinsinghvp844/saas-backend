@@ -8,6 +8,7 @@ require_once "../config/db.php";
 require_once "../middleware/auth.php";
 require_once "../middleware/roleGuard.php";
 require_once "../mailer/send-template.php"; // ✅ NEW
+require_once "../helpers/auditLog.php";
 
 /* ✅ SLUG GENERATOR */
 function generateSlug(PDO $conn, string $name): string {
@@ -223,6 +224,16 @@ try {
 
     /* ✅ 13️⃣ COMMIT */
     $conn->commit();
+
+
+    /* ✅ 13.1️⃣ AUDIT LOG: GYM CREATED */
+logAudit([
+    "action"      => "created",
+    "module"      => "gym",
+    "target_type" => "gym",
+    "target_id"   => (int)$gym_id,
+    "description" => "Super admin created gym: {$gym['gym_name']} (Owner: {$owner['owner_email']})"
+]);
 
     /* ✅ 14️⃣ SEND EMAIL (TEMPLATE BASED ✅) */
     $loginUrl = "http://localhost:5173/login";

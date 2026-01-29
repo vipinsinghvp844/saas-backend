@@ -4,6 +4,7 @@ header("Content-Type: application/json");
 
 require_once "../config/db.php";
 require_once "../config/jwt.php"; // createJWT()
+require_once "../helpers/auditLog.php";
 
 try {
 
@@ -46,18 +47,38 @@ try {
     $stmt->execute([":email" => $email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    /* ✅ INVALID CREDENTIALS */
+    /* ==========================
+       ❌ INVALID CREDENTIALS
+    ========================== */
     if (!$user || !password_verify($password, $user['password'])) {
+
+        logAudit([
+            "action" => "failed_login",
+            "module" => "auth",
+            "description" => "Failed login attempt for email: {$email}"
+        ]);
+
         http_response_code(401);
         echo json_encode([
             "status" => false,
             "message" => "Invalid credentials"
         ]);
         exit;
-    } 
+    }
 
-    /* ✅ USER STATUS CHECK */
+    /* ==========================
+       ❌ USER STATUS CHECK
+    ========================== */
     if (strtolower($user['status']) !== 'active') {
+
+        logAudit([
+            "action" => "login_blocked",
+            "module" => "auth",
+            "target_type" => "user",
+            "target_id" => (int)$user['id'],
+            "description" => "Blocked user attempted login"
+        ]);
+
         http_response_code(403);
         echo json_encode([
             "status" => false,
@@ -97,9 +118,7 @@ try {
             exit;
         }
 
-        // ✅ PRODUCTION READY: gyms.status must be active
-        $gymStatus = strtolower(trim($gym['status'] ?? 'inactive'));
-        if ($gymStatus !== 'active') {
+        if (strtolower($gym['status']) !== 'active') {
             http_response_code(403);
             echo json_encode([
                 "status" => false,
@@ -108,18 +127,16 @@ try {
             exit;
         }
 
-        // ✅ Billing status logic
-        $billingStatus = strtolower(trim($gym['billing_status'] ?? 'trial'));
-
+        /* ==========================
+           💳 BILLING / TRIAL CHECK
+        ========================== */
+        $billingStatus = strtolower($gym['billing_status'] ?? 'trial');
         $trialExpired = false;
+
         if (!empty($gym['trial_ends_at'])) {
-            $trialEndsTs = strtotime($gym['trial_ends_at']);
-            if ($trialEndsTs && $trialEndsTs < time()) {
-                $trialExpired = true;
-            }
+            $trialExpired = strtotime($gym['trial_ends_at']) < time();
         }
 
-        // ✅ If trial expired & not paid => BLOCK + send billing required
         if ($billingStatus !== 'paid' && $trialExpired) {
             http_response_code(403);
             echo json_encode([
@@ -138,7 +155,9 @@ try {
             exit;
         }
 
-        // ✅ optional subscription info for frontend usage
+        /* ==========================
+           📦 SUBSCRIPTION (OPTIONAL)
+        ========================== */
         $subStmt = $conn->prepare("
             SELECT 
                 gs.id,
@@ -175,7 +194,7 @@ try {
     }
 
     /* ==========================
-       ✅ JWT CREATE
+       🔐 JWT CREATE
     ========================== */
     $token = createJWT([
         "id"     => (int)$user['id'],
@@ -183,6 +202,24 @@ try {
         "role"   => $user['role']
     ]);
 
+    /* ==========================
+       ✅ AUDIT LOG: SUCCESS LOGIN
+    ========================== */
+   logAudit([
+  "user_id"   => (int)$user['id'],
+  "user_name" => trim($user['first_name'] . " " . $user['last_name']),
+  "user_role" => $user['role'],
+
+  "action" => "login",
+  "module" => "auth",
+  "target_type" => "user",
+  "target_id" => (int)$user['id'],
+  "description" => "User logged in successfully"
+]);
+
+    /* ==========================
+       ✅ RESPONSE
+    ========================== */
     echo json_encode([
         "status" => true,
         "token"  => $token,
