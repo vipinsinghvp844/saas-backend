@@ -85,7 +85,7 @@ try {
     ========================== */
     $stmt = $conn->prepare("
         SELECT COALESCE(SUM(p.amount), 0)
-        FROM payments p
+        FROM member_payments p
         WHERE p.gym_id = :gym_id
           AND p.status = 'paid'
           AND MONTH(p.created_at) = MONTH(CURRENT_DATE())
@@ -155,6 +155,33 @@ $stmt->execute([":gym_id" => $gymId]);
 
 $memberGrowth = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+/* ==========================
+   ⏰ EXPIRING MEMBERSHIPS (NEXT 7 DAYS)
+========================== */
+$stmt = $conn->prepare("
+    SELECT COUNT(*)
+    FROM member_subscriptions
+    WHERE gym_id = :gym_id
+      AND status = 'active'
+      AND end_date BETWEEN CURRENT_DATE()
+                        AND DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)
+");
+$stmt->execute([":gym_id" => $gymId]);
+$expiringSoon = (int)$stmt->fetchColumn();
+
+/* ==========================
+   🏋️ TODAY ATTENDANCE
+========================== */
+$stmt = $conn->prepare("
+    SELECT COUNT(*)
+    FROM member_attendance
+    WHERE gym_id = :gym_id
+      AND attendance_date = CURRENT_DATE()
+      AND status = 'present'
+");
+$stmt->execute([":gym_id" => $gymId]);
+$todayAttendance = (int)$stmt->fetchColumn();
+
 
 
     /* ==========================
@@ -169,7 +196,9 @@ $memberGrowth = $stmt->fetchAll(PDO::FETCH_ASSOC);
             "total_trainers"  => $totalTrainers,
             "total_staff"     => $totalStaff,
             "total_pages"     => $totalPages,
-            "monthly_revenue" => $monthlyRevenue
+            "monthly_revenue" => $monthlyRevenue,
+            "expiring_memberships" => $expiringSoon,
+            "today_attendance" => $todayAttendance
         ],
 
         "charts" => [
