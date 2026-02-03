@@ -7,10 +7,15 @@ require_once "../../middleware/auth.php";
 require_once "../../middleware/roleGuard.php";
 require_once "../../helpers/auditLog.php";
 
+function generatePassword($len = 8) {
+    $chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    return substr(str_shuffle($chars), 0, $len);
+}
+
 try {
 
     /* ==========================
-       🔐 AUTH
+       AUTH
     ========================== */
     $auth = authenticate();
     $GLOBALS['auth_user'] = $auth;
@@ -19,7 +24,7 @@ try {
     $gymId = (int)$auth['gym_id'];
 
     /* ==========================
-       📥 INPUT
+       INPUT
     ========================== */
     $data = json_decode(file_get_contents("php://input"), true);
 
@@ -37,38 +42,54 @@ try {
     $paymentMethod = $data['payment_method'] ?? null;
 
     if ($firstName === '' || $phone === '' || $planId === 0) {
-        http_response_code(400);
-        echo json_encode([
-            "status" => false,
-            "message" => "Required fields missing"
-        ]);
-        exit;
+        throw new Exception("Required fields missing");
     }
 
     /* ==========================
-       🗄 DB
+       DB
     ========================== */
     $db = new Database();
     $conn = $db->connect();
     $conn->beginTransaction();
 
     /* ==========================
-       👤 USER (MEMBER)
+       DUPLICATE CHECKS
     ========================== */
+
+    // Phone unique per gym
     $stmt = $conn->prepare("
         SELECT id FROM users
-        WHERE gym_id = :gym_id AND email = :email
+        WHERE gym_id = :gym_id AND phone = :phone
         LIMIT 1
     ");
     $stmt->execute([
         ":gym_id" => $gymId,
-        ":email"  => $email
+        ":phone"  => $phone
     ]);
-    $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($existingUser) {
-        throw new Exception("Member with this email already exists");
+    if ($stmt->fetch()) {
+        throw new Exception("Member with this phone already exists");
     }
+
+    // Email unique (only if provided)
+    if ($email !== '') {
+        $stmt = $conn->prepare("
+            SELECT id FROM users
+            WHERE gym_id = :gym_id AND email = :email
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ":gym_id" => $gymId,
+            ":email"  => $email
+        ]);
+        if ($stmt->fetch()) {
+            throw new Exception("Member with this email already exists");
+        }
+    }
+
+    /* ==========================
+       USER (MEMBER LOGIN)
+    ========================== */
+    $plainPassword = generatePassword();
 
     $stmt = $conn->prepare("
         INSERT INTO users (
@@ -77,6 +98,7 @@ try {
             last_name,
             email,
             phone,
+            password,
             role,
             status,
             force_password_change,
@@ -87,6 +109,7 @@ try {
             :last_name,
             :email,
             :phone,
+            :password,
             'member',
             'active',
             1,
@@ -98,13 +121,14 @@ try {
         ":first_name" => $firstName,
         ":last_name"  => $lastName,
         ":email"      => $email ?: null,
-        ":phone"      => $phone
+        ":phone"      => $phone,
+        ":password"   => password_hash($plainPassword, PASSWORD_DEFAULT),
     ]);
 
     $userId = $conn->lastInsertId();
 
     /* ==========================
-       🧾 MEMBER PROFILE
+       MEMBER PROFILE
     ========================== */
     $stmt = $conn->prepare("
         INSERT INTO members (
@@ -137,7 +161,7 @@ try {
     $memberId = $conn->lastInsertId();
 
     /* ==========================
-       📦 MEMBERSHIP PLAN
+       MEMBERSHIP PLAN
     ========================== */
     $stmt = $conn->prepare("
         SELECT duration_days
@@ -185,14 +209,21 @@ try {
     ]);
 
     /* ==========================
-       💰 PAYMENT (OPTIONAL)
+       PAYMENT (OPTIONAL)
     ========================== */
     if ($paymentAmount && $paymentAmount > 0) {
+
+        $allowedMethods = ['cash','upi','card','bank','stripe','razorpay'];
+        if ($paymentMethod && !in_array($paymentMethod, $allowedMethods)) {
+            throw new Exception("Invalid payment method");
+        }
+
         $stmt = $conn->prepare("
             INSERT INTO member_payments (
                 gym_id,
                 member_id,
                 user_id,
+                payment_for,
                 amount,
                 payment_method,
                 status,
@@ -202,6 +233,7 @@ try {
                 :gym_id,
                 :member_id,
                 :user_id,
+                'membership',
                 :amount,
                 :method,
                 'paid',
@@ -219,7 +251,7 @@ try {
     }
 
     /* ==========================
-       🧾 AUDIT LOG
+       AUDIT LOG
     ========================== */
     logAudit([
         "action"      => "created",
@@ -236,7 +268,8 @@ try {
         "message" => "Member added successfully",
         "data" => [
             "member_id" => $memberId,
-            "user_id"   => $userId
+            "user_id"   => $userId,
+            "temp_password" => $plainPassword // optional: remove later
         ]
     ]);
     exit;
@@ -247,7 +280,7 @@ try {
         $conn->rollBack();
     }
 
-    http_response_code(500);
+    http_response_code(400);
     echo json_encode([
         "status"  => false,
         "message" => $e->getMessage()
