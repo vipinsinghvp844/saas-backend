@@ -9,15 +9,14 @@ require_once "../../middleware/roleGuard.php";
 try {
 
     /* ==========================
-       🔐 AUTH
+       AUTH
     ========================== */
     $auth = authenticate();
     requireRole(['gym_admin']);
-
     $gymId = (int)$auth['gym_id'];
 
     /* ==========================
-       📥 INPUTS
+       PAGINATION + FILTERS
     ========================== */
     $page   = max(1, (int)($_GET['page'] ?? 1));
     $limit  = min(50, max(10, (int)($_GET['limit'] ?? 10)));
@@ -26,78 +25,55 @@ try {
     $search = trim($_GET['search'] ?? '');
     $status = trim($_GET['status'] ?? '');
 
-    $db = new Database();
-    $conn = $db->connect();
-
-    /* ==========================
-       🔎 WHERE
-    ========================== */
-    $where  = "m.gym_id = :gym_id";
+    $where  = "t.gym_id = :gym_id";
     $params = [":gym_id" => $gymId];
 
     if ($status !== '') {
-        $where .= " AND m.status = :status";
+        $where .= " AND t.status = :status";
         $params[":status"] = $status;
     }
 
     if ($search !== '') {
         $where .= " AND (
-            u.first_name LIKE :search OR
-            u.last_name  LIKE :search OR
-            u.email      LIKE :search OR
-            m.phone      LIKE :search
+            t.name LIKE :search OR
+            t.email LIKE :search OR
+            t.specialty LIKE :search
         )";
         $params[":search"] = "%{$search}%";
     }
 
+    $db = new Database();
+    $conn = $db->connect();
+
     /* ==========================
-       📊 TOTAL COUNT
+       TOTAL COUNT
     ========================== */
     $stmt = $conn->prepare("
-        SELECT COUNT(DISTINCT m.id)
-        FROM members m
-        INNER JOIN users u ON u.id = m.user_id
-        LEFT JOIN member_subscriptions ms 
-            ON ms.member_id = m.id 
-           AND ms.status = 'active'
-        LEFT JOIN gym_membership_plans p 
-            ON p.id = ms.plan_id
+        SELECT COUNT(*)
+        FROM trainers t
         WHERE $where
     ");
     $stmt->execute($params);
     $total = (int)$stmt->fetchColumn();
 
     /* ==========================
-       📋 MEMBERS LIST
+       LIST DATA
     ========================== */
     $stmt = $conn->prepare("
         SELECT
-            m.id,
-            m.status,
-            m.phone,
-            m.created_at AS joined_at,
+            t.id,
+            t.name,
+            t.email,
+            t.phone,
+            t.specialty,
+            t.status,
+            t.created_at,
 
-            u.first_name,
-            u.last_name,
-            u.email,
-            u.avatar,
-
-            p.id   AS plan_id,
-            p.name AS plan_name
-
-        FROM members m
-        INNER JOIN users u ON u.id = m.user_id
-
-        LEFT JOIN member_subscriptions ms 
-            ON ms.member_id = m.id 
-           AND ms.status = 'active'
-
-        LEFT JOIN gym_membership_plans p 
-            ON p.id = ms.plan_id
-
+            u.id AS user_id
+        FROM trainers t
+        LEFT JOIN users u ON u.id = t.user_id
         WHERE $where
-        GROUP BY m.id
-        ORDER BY m.id DESC
+        ORDER BY t.id DESC
         LIMIT :limit OFFSET :offset
     ");
 
@@ -108,30 +84,26 @@ try {
     $stmt->bindValue(":offset", $offset, PDO::PARAM_INT);
 
     $stmt->execute();
-    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $trainers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    /* ==========================
-       📦 RESPONSE
-    ========================== */
     echo json_encode([
         "status" => true,
-        "data" => $members,
+        "data" => $trainers,
         "pagination" => [
-            "page"        => $page,
-            "limit"       => $limit,
-            "total"       => $total,
+            "page" => $page,
+            "limit" => $limit,
+            "total" => $total,
             "total_pages" => (int)ceil($total / $limit)
         ]
     ]);
     exit;
 
 } catch (Exception $e) {
-
     http_response_code(500);
     echo json_encode([
-        "status"  => false,
-        "message" => "Failed to load members",
-        "error"   => $e->getMessage()
+        "status" => false,
+        "message" => "Failed to load trainers",
+        "error" => $e->getMessage()
     ]);
     exit;
 }

@@ -136,18 +136,14 @@ try {
             user_id,
             status,
             join_date,
-            source,
             gender,
-            dob,
             created_at
         ) VALUES (
             :gym_id,
             :user_id,
             'active',
             CURRENT_DATE(),
-            'admin',
             :gender,
-            :dob,
             NOW()
         )
     ");
@@ -155,7 +151,6 @@ try {
         ":gym_id" => $gymId,
         ":user_id"=> $userId,
         ":gender" => $gender,
-        ":dob"    => $dob
     ]);
 
     $memberId = $conn->lastInsertId();
@@ -165,7 +160,7 @@ try {
     ========================== */
     $stmt = $conn->prepare("
         SELECT duration_days
-        FROM membership_plans
+        FROM gym_membership_plans
         WHERE id = :id AND gym_id = :gym_id
         LIMIT 1
     ");

@@ -12,7 +12,6 @@ try {
        🔐 AUTH
     ========================== */
     $auth = authenticate();
-    $GLOBALS['auth_user'] = $auth;
     requireRole(['gym_admin']);
 
     $gymId = (int)$auth['gym_id'];
@@ -28,8 +27,8 @@ try {
     ];
 
     if ($status !== 'all') {
-        $where .= " AND status = :status";
-        $params[":status"] = $status;
+        $where .= " AND is_active = :is_active";
+        $params[":is_active"] = ($status === 'active') ? 1 : 0;
     }
 
     /* ==========================
@@ -51,7 +50,7 @@ try {
             currency,
             billing_cycle,
             duration_days,
-            status,
+            is_active,
             sort_order,
             features_json
         FROM gym_membership_plans

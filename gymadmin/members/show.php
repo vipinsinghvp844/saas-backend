@@ -33,15 +33,14 @@ try {
             m.id AS member_id,
             m.status,
             m.join_date,
-            m.source,
             m.gender,
-            m.dob,
 
             u.id AS user_id,
             u.first_name,
             u.last_name,
             u.email,
-            u.phone
+            u.phone,
+            u.dob
         FROM members m
         INNER JOIN users u ON u.id = m.user_id
         WHERE m.id = :member_id
@@ -72,7 +71,7 @@ try {
             ms.status,
             DATEDIFF(ms.end_date, CURRENT_DATE()) AS days_left
         FROM member_subscriptions ms
-        INNER JOIN membership_plans mp ON mp.id = ms.plan_id
+        INNER JOIN gym_membership_plans mp ON mp.id = ms.plan_id
         WHERE ms.member_id = :member_id
           AND ms.gym_id = :gym_id
           AND ms.status = 'active'
@@ -152,9 +151,8 @@ try {
                 "phone"      => $member['phone'],
                 "status"     => $member['status'],
                 "joined_at"  => $member['join_date'],
-                "source"     => $member['source'],
                 "gender"     => $member['gender'],
-                "dob"        => $member['dob']
+                "dob"       => $member['dob'], 
             ],
 
             "subscription" => $subscription ? [
