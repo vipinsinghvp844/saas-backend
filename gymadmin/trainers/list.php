@@ -66,6 +66,7 @@ try {
             t.email,
             t.phone,
             t.specialty,
+            t.rating,
             t.status,
             t.created_at,
 
